@@ -9,8 +9,6 @@ from .form import UploadFileForm
 
 logger = logging.getLogger('log')
 
-
-
 def handle_uploaded_file(file):
     df = pd.read_excel(file)
 
@@ -18,7 +16,7 @@ def handle_uploaded_file(file):
     for _, row in df.iterrows():
         Falans.objects.create(
             Prssure=row['压力'],
-            Diameter=row['通经'],
+            Diameter=row['通径'],
             Lenght=row['长度'],
             OutsideDiameter=row['外径'],
             Centre=row['孔中心'],
