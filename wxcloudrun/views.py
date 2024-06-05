@@ -1,91 +1,41 @@
 import json
 import logging
-
 from django.http import JsonResponse
-from django.shortcuts import render
-from wxcloudrun.models import Counters
-
+from django.shortcuts import render, redirect
+from django.contrib import messages
+import pandas as pd
+from .models import Falans
+from .form import UploadFileForm
 
 logger = logging.getLogger('log')
 
 
-def index(request, _):
-    """
-    获取主页
 
-     `` request `` 请求对象
-    """
+def handle_uploaded_file(file):
+    df = pd.read_excel(file)
 
-    return render(request, 'index.html')
+    # 遍历DataFrame中的每一行并创建Falans对象
+    for _, row in df.iterrows():
+        Falans.objects.create(
+            Prssure=row['压力'],
+            Diameter=row['通经'],
+            Lenght=row['长度'],
+            OutsideDiameter=row['外径'],
+            Centre=row['孔中心'],
+            WaterLineStep=row['水线台阶'],
+            Thick=row['厚度'],
+            WaterLineHeight=row['水线高度'],
+            Count=row['孔数量']
+        )
 
 
-def counter(request, _):
-    """
-    获取当前计数
-
-     `` request `` 请求对象
-    """
-
-    rsp = JsonResponse({'code': 0, 'errorMsg': ''}, json_dumps_params={'ensure_ascii': False})
-    if request.method == 'GET' or request.method == 'get':
-        rsp = get_count()
-    elif request.method == 'POST' or request.method == 'post':
-        rsp = update_count(request)
+def upload_file(request):
+    if request.method == 'POST':
+        form = UploadFileForm(request.POST, request.FILES)
+        if form.is_valid():
+            handle_uploaded_file(request.FILES['file'])
+            messages.success(request, '文件上传并处理成功！')
+            return redirect('upload_file')
     else:
-        rsp = JsonResponse({'code': -1, 'errorMsg': '请求方式错误'},
-                            json_dumps_params={'ensure_ascii': False})
-    logger.info('response result: {}'.format(rsp.content.decode('utf-8')))
-    return rsp
-
-
-def get_count():
-    """
-    获取当前计数
-    """
-
-    try:
-        data = Counters.objects.get(id=1)
-    except Counters.DoesNotExist:
-        return JsonResponse({'code': 0, 'data': 0},
-                    json_dumps_params={'ensure_ascii': False})
-    return JsonResponse({'code': 0, 'data': data.count},
-                        json_dumps_params={'ensure_ascii': False})
-
-
-def update_count(request):
-    """
-    更新计数，自增或者清零
-
-    `` request `` 请求对象
-    """
-
-    logger.info('update_count req: {}'.format(request.body))
-
-    body_unicode = request.body.decode('utf-8')
-    body = json.loads(body_unicode)
-
-    if 'action' not in body:
-        return JsonResponse({'code': -1, 'errorMsg': '缺少action参数'},
-                            json_dumps_params={'ensure_ascii': False})
-
-    if body['action'] == 'inc':
-        try:
-            data = Counters.objects.get(id=1)
-        except Counters.DoesNotExist:
-            data = Counters()
-        data.id = 1
-        data.count += 1
-        data.save()
-        return JsonResponse({'code': 0, "data": data.count},
-                    json_dumps_params={'ensure_ascii': False})
-    elif body['action'] == 'clear':
-        try:
-            data = Counters.objects.get(id=1)
-            data.delete()
-        except Counters.DoesNotExist:
-            logger.info('record not exist')
-        return JsonResponse({'code': 0, 'data': 0},
-                    json_dumps_params={'ensure_ascii': False})
-    else:
-        return JsonResponse({'code': -1, 'errorMsg': 'action参数错误'},
-                    json_dumps_params={'ensure_ascii': False})
+        form = UploadFileForm()
+    return render(request, 'upload.html', {'form': form})
